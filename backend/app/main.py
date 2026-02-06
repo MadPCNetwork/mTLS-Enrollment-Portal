@@ -20,9 +20,23 @@ from .routes.requests import router as requests_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Startup - config loads from env + yaml automatically
     load_config()
     await init_db()
+    
+    # Pre-warm OIDC discovery and JWKS caches so the first user request
+    # doesn't trigger a cold fetch (which can fail transiently and cause 503s)
+    try:
+        from .auth import get_oidc_config, get_jwks
+        await get_oidc_config()
+        await get_jwks()
+        logger.info("OIDC discovery and JWKS caches pre-warmed successfully")
+    except Exception as e:
+        logger.warning(f"Failed to pre-warm OIDC caches (will retry on first request): {e}")
+    
     yield
     # Shutdown
     pass

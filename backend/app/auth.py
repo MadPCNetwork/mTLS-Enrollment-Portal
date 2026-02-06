@@ -113,46 +113,69 @@ async def validate_token(token: str) -> UserClaims:
     
     Authentik access tokens may be opaque or JWTs without audience.
     We validate by fetching userinfo - if it succeeds, the token is valid.
-    """
-    config = get_config()
     
-    try:
-        # First, try to get userinfo - this validates the token with the OIDC provider
+    Retries transient OIDC provider errors (e.g. cold cache after startup)
+    to avoid 503s on the first request after login.
+    """
+    import asyncio
+    import logging
+    
+    config = get_config()
+    logger = logging.getLogger(__name__)
+    
+    max_retries = 2
+    retry_delay = 0.5  # seconds
+    
+    for attempt in range(max_retries + 1):
         try:
-            userinfo = await get_userinfo(token)
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 401:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or expired token",
-                )
+            # Try to get userinfo - this validates the token with the OIDC provider
+            try:
+                userinfo = await get_userinfo(token)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 401:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid or expired token",
+                    )
+                raise
+            
+            # Extract groups - Authentik uses 'groups' claim
+            groups = userinfo.get("groups", [])
+            if isinstance(groups, str):
+                groups = [groups]
+            
+            return UserClaims(
+                sub=userinfo.get("sub"),
+                email=userinfo.get("email"),
+                email_verified=userinfo.get("email_verified"),
+                preferred_username=userinfo.get("preferred_username"),
+                given_name=userinfo.get("given_name"),
+                family_name=userinfo.get("family_name"),
+                name=userinfo.get("name"),
+                groups=groups,
+                locale=userinfo.get("locale"),
+                raw_claims=userinfo,
+            )
+            
+        except HTTPException:
             raise
-        
-        # Extract groups - Authentik uses 'groups' claim
-        groups = userinfo.get("groups", [])
-        if isinstance(groups, str):
-            groups = [groups]
-        
-        return UserClaims(
-            sub=userinfo.get("sub"),
-            email=userinfo.get("email"),
-            email_verified=userinfo.get("email_verified"),
-            preferred_username=userinfo.get("preferred_username"),
-            given_name=userinfo.get("given_name"),
-            family_name=userinfo.get("family_name"),
-            name=userinfo.get("name"),
-            groups=groups,
-            locale=userinfo.get("locale"),
-            raw_claims=userinfo,
-        )
-        
-    except HTTPException:
-        raise
-    except httpx.HTTPError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"OIDC provider unavailable: {str(e)}",
-        )
+        except httpx.HTTPError as e:
+            if attempt < max_retries:
+                logger.warning(
+                    f"OIDC provider request failed (attempt {attempt + 1}/{max_retries + 1}), "
+                    f"retrying in {retry_delay}s: {e}"
+                )
+                # Clear caches in case they hold stale/bad data
+                global _oidc_config_cache, _jwks_cache
+                _oidc_config_cache = None
+                _jwks_cache = None
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # exponential backoff
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"OIDC provider unavailable: {str(e)}",
+                )
 
 
 # FastAPI security scheme

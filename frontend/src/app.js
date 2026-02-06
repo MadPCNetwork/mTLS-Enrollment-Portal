@@ -340,6 +340,8 @@ async function loadCAs() {
         renderCAList();
     } catch (error) {
         console.error('Failed to load CAs:', error);
+        // Re-throw transient errors so loadAllData can retry
+        if (error.message && error.message.includes('OIDC provider unavailable')) throw error;
         showToast('Failed to load certificate authorities', 'error');
     }
 }
@@ -350,6 +352,7 @@ async function loadRequests() {
         renderRequestsList();
     } catch (error) {
         console.error('Failed to load requests:', error);
+        if (error.message && error.message.includes('OIDC provider unavailable')) throw error;
     }
 }
 
@@ -359,6 +362,7 @@ async function loadCertificates() {
         renderCertificatesList();
     } catch (error) {
         console.error('Failed to load certificates:', error);
+        if (error.message && error.message.includes('OIDC provider unavailable')) throw error;
     }
 }
 
@@ -369,6 +373,7 @@ async function loadPendingApprovals() {
         updateApproveTab();
     } catch (error) {
         console.error('Failed to load pending approvals:', error);
+        if (error.message && error.message.includes('OIDC provider unavailable')) throw error;
     }
 }
 
@@ -382,6 +387,7 @@ async function checkIfAdmin() {
         }
     } catch (error) {
         console.error('Failed to check admin status:', error);
+        if (error.message && error.message.includes('OIDC provider unavailable')) throw error;
         state.isAdmin = false;
     }
 }
@@ -471,14 +477,24 @@ function updateAdminTab() {
     }
 }
 
-async function loadAllData() {
-    await Promise.all([
-        loadCAs(),
-        loadRequests(),
-        loadCertificates(),
-        loadPendingApprovals(),
-        checkIfAdmin(),
-    ]);
+async function loadAllData(retries = 2) {
+    try {
+        await Promise.all([
+            loadCAs(),
+            loadRequests(),
+            loadCertificates(),
+            loadPendingApprovals(),
+            checkIfAdmin(),
+        ]);
+    } catch (error) {
+        // Retry on transient 503s (OIDC provider not yet available after login)
+        if (retries > 0 && error.message && error.message.includes('OIDC provider unavailable')) {
+            console.warn(`Data load failed with transient error, retrying in 1s... (${retries} retries left)`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return loadAllData(retries - 1);
+        }
+        console.error('Failed to load data:', error);
+    }
 }
 
 // ============================================================================
