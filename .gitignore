@@ -1,0 +1,58 @@
+# Dependencies
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+.eggs/
+*.egg-info/
+dist/
+build/
+pkgs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Secrets (NEVER commit these)
+secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Config (should be mounted at runtime)
+config/config.yaml
+config/oidc-config.json
+config.yaml
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/

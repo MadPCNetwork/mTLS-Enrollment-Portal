@@ -1,0 +1,55 @@
+services:
+  # Frontend - Nginx serving SPA and reverse proxying API
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3011:80"
+    depends_on:
+      - backend
+    networks:
+      - pki-network
+    restart: unless-stopped
+
+  # Backend - FastAPI application
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    volumes:
+      # Mount configuration for CA/subject mapping only
+      - ./config.yaml:/app/config.yaml:ro
+      # Mount CA certificates and keys
+      - ./secrets:/secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - pki-network
+    restart: unless-stopped
+
+  # Database - PostgreSQL
+  db:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pki-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  pki-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,89 @@
+# ============================================================================
+# mTLS PKI Portal - Certificate & Subject Configuration
+# ============================================================================
+# This file ONLY contains certificate authority definitions and subject mapping.
+# All other settings are in the .env file.
+
+# ============================================================================
+# Admin Configuration
+# ============================================================================
+# Members of these groups have admin access to view and revoke all certificates
+admin_groups:
+  - "ROOT"
+
+
+# ============================================================================
+# Certificate Subject Configuration
+# ============================================================================
+# The subject attributes control what goes into the X.509 certificate's
+# Subject Distinguished Name (DN).
+#
+# Two types of attributes:
+# 1. "static" - Always included with the specified value
+# 2. "mapping" - Maps OIDC claims to X.509 attributes
+#    - If the OIDC claim is empty/missing, the attribute is SKIPPED
+#    - If the claim is a list (e.g., groups), multiple RDNs are created
+
+subject_attributes:
+  # Static attributes are always written to the certificate
+  static:
+    O: "Acme Corp"           # Organization
+    C: "US"                  # Country
+
+  # Mapped attributes come from OIDC claims
+  # Format: X509_Attribute: "oidc_claim_name"
+  mapping:
+    CN: "preferred_username" # Common Name -> jdoe
+    UID: "sub"              # User ID -> auth0|123456...
+    GN: "given_name"        # Given Name -> John
+    SN: "family_name"       # Surname -> Doe
+    OU: "groups"            # Org Unit -> Creates multiple OU= entries for list
+    # L: "locale"           # Locality -> Often empty, will be skipped
+
+# ============================================================================
+# Subject Alternative Name (SAN) Configuration
+# ============================================================================
+san_mapping:
+  # Map email SAN to OIDC claim
+  email: "email"
+  
+  # Static DNS names (optional)
+  # dns:
+  #   - "internal.example.com"
+
+# ============================================================================
+# Certificate Authorities
+# ============================================================================
+# Each CA can have multiple rules for different groups.
+# Rules are evaluated in order - first match wins.
+
+x509_cas:
+  - id: "internal-mtls"
+    name: "Internal Network Access"
+    cert_path: "/secrets/internal-ca.crt"
+    key_path: "/secrets/internal-ca.key"
+    # key_password_env_var: "INTERNAL_CA_KEY_PASSWORD"  # If key is encrypted
+    
+    rules:
+      # Admins get auto-approved with 1-year certificates
+      - oidc_groups: ["admins", "security"]
+        auto_approve: true
+        max_ttl: "8760h"  # 1 year
+      
+      # Staff need approval from security team
+      - oidc_groups: ["staff", "employees"]
+        auto_approve: false
+        max_active_certs: 1
+        allow_request_over_quota: true
+        approver_groups: ["security", "admins"]
+        max_ttl: "720h"   # 30 days
+
+  # Example: VPN Access CA
+  # - id: "vpn-access"
+  #   name: "VPN Access"
+  #   cert_path: "/secrets/vpn-ca.crt"
+  #   key_path: "/secrets/vpn-ca.key"
+  #   rules:
+  #     - oidc_groups: ["vpn-users"]
+  #       auto_approve: true
+  #       max_ttl: "168h"  # 7 days

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Zero-Trust mTLS Certificate Management Portal - Self-service certificate generation with OIDC authentication">
+    <title>mTLS PKI Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen active">
+            <div class="login-container">
+                <div class="login-card glass">
+                    <div class="logo">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L4 5V11C4 16.55 7.84 21.74 12 23C16.16 21.74 20 16.55 20 11V5L12 2Z"
+                                stroke="url(#gradient)" stroke-width="2" fill="none" />
+                            <path d="M9 12L11 14L15 10" stroke="url(#gradient)" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                            <defs>
+                                <linearGradient id="gradient" x1="4" y1="2" x2="20" y2="23"
+                                    gradientUnits="userSpaceOnUse">
+                                    <stop stop-color="#6366f1" />
+                                    <stop offset="1" stop-color="#8b5cf6" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                    <h1>mTLS PKI Portal</h1>
+                    <p class="subtitle">Zero-Trust Certificate Management</p>
+                    <button id="login-btn" class="btn btn-primary btn-large">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                            <polyline points="10 17 15 12 10 7" />
+                            <line x1="15" y1="12" x2="3" y2="12" />
+                        </svg>
+                        Sign in
+                    </button>
+                    <p class="security-note">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                        Self Service mTLS Enrollment
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Screen -->
+        <div id="dashboard-screen" class="screen">
+            <header class="header glass">
+                <div class="header-left">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L4 5V11C4 16.55 7.84 21.74 12 23C16.16 21.74 20 16.55 20 11V5L12 2Z"
+                            stroke="url(#gradient2)" stroke-width="2" fill="none" />
+                        <path d="M9 12L11 14L15 10" stroke="url(#gradient2)" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        <defs>
+                            <linearGradient id="gradient2" x1="4" y1="2" x2="20" y2="23" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#6366f1" />
+                                <stop offset="1" stop-color="#8b5cf6" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <span class="header-title">PKI Portal</span>
+                </div>
+                <div class="header-right">
+                    <div class="user-info">
+                        <span id="user-name">User</span>
+                        <div class="avatar" id="user-avatar">U</div>
+                    </div>
+                    <button id="logout-btn" class="btn btn-ghost" title="Sign out">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <nav class="tabs">
+                <button class="tab active" data-tab="certificates">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L4 5V11C4 16.55 7.84 21.74 12 23C16.16 21.74 20 16.55 20 11V5L12 2Z" />
+                    </svg>
+                    My Certificates
+                </button>
+                <button class="tab" data-tab="request">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="16" />
+                        <line x1="8" y1="12" x2="16" y2="12" />
+                    </svg>
+                    Request Certificate
+                </button>
+                <button class="tab hidden" data-tab="approve" id="approve-tab">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                    Approve Requests
+                    <span class="badge" id="pending-count">0</span>
+                </button>
+                <button class="tab hidden" data-tab="admin" id="admin-tab">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L4 5V11C4 16.55 7.84 21.74 12 23C16.16 21.74 20 16.55 20 11V5L12 2Z" />
+                        <path d="M12 11.99V8" />
+                        <path d="M12 16h.01" />
+                    </svg>
+                    Admin
+                </button>
+            </nav>
+
+            <main class="main-content">
+                <!-- Certificates Tab -->
+                <section id="certificates-section" class="section active">
+                    <div class="section-header">
+                        <h2>Your Certificates</h2>
+                    </div>
+                    <div id="certificates-list" class="card-list">
+                        <div class="empty-state">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5">
+                                <path d="M12 2L4 5V11C4 16.55 7.84 21.74 12 23C16.16 21.74 20 16.55 20 11V5L12 2Z" />
+                            </svg>
+                            <p>No certificates yet</p>
+                            <span>Request a certificate to get started</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Request Tab -->
+                <section id="request-section" class="section">
+                    <div class="section-header">
+                        <h2>Request New Certificate</h2>
+                        <p>Select a Certificate Authority to request a new identity certificate.</p>
+                    </div>
+                    <div id="ca-list" class="card-list">
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Loading available CAs...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Approve Tab -->
+                <section id="approve-section" class="section">
+                    <div class="section-header">
+                        <h2>Pending Approvals</h2>
+                        <p>Review and approve certificate requests from your team.</p>
+                    </div>
+                    <div id="pending-list" class="card-list">
+                        <div class="empty-state">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                            </svg>
+                            <p>No pending requests</p>
+                            <span>All caught up!</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Admin Tab -->
+                <section id="admin-section" class="section">
+                    <div class="section-header">
+                        <h2>Certificate Administration</h2>
+                        <p>View and manage all users' certificates.</p>
+                    </div>
+                    <div id="admin-certificates-list" class="admin-table-container">
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Loading certificates...</p>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- Modal Overlay -->
+        <div id="modal-overlay" class="modal-overlay">
+            <div id="modal" class="modal glass">
+                <button class="modal-close" id="modal-close">&times;</button>
+                <div id="modal-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include forge for PKCS#12 support -->
+    <script src="https://cdn.jsdelivr.net/npm/node-forge@1.3.1/dist/forge.min.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+
+</html>
