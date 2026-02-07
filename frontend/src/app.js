@@ -589,6 +589,18 @@ function renderCAList() {
                 }
             }
 
+            const graceHours = ca.renewal_grace_period_hours || 0;
+            const certsInGrace = ca.certs_in_grace_period || 0;
+            let graceHtml = '';
+            if (graceHours > 0) {
+                graceHtml = `
+                    <div class="quota-grace-info">
+                        <span class="quota-grace-label">Renewal window: ${formatTTL(graceHours)} before expiry</span>
+                        ${certsInGrace > 0 ? `<span class="quota-grace-detail">${certsInGrace} cert(s) in renewal window (not counted against quota)</span>` : ''}
+                    </div>
+                `;
+            }
+
             quotaHtml = `
                  <div class="quota-container">
                      <div class="quota-header">
@@ -601,6 +613,7 @@ function renderCAList() {
                      ${ca.quota_exceeded && !ca.allow_request_over_quota ?
                     `<div class="quota-error-text">Limit reached - revoke certificates to request more</div>` :
                     (ca.quota_exceeded ? `<div class="quota-warning-text">Limit reached - requests require manual approval</div>` : '')}
+                     ${graceHtml}
                  </div>
              `;
         }

@@ -1168,3 +1168,24 @@ p {
     font-size: 0.75rem;
     color: var(--color-error);
 }
+
+.quota-grace-info {
+    margin-top: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    background: rgba(99, 179, 237, 0.08);
+    border-radius: 6px;
+    border-left: 2px solid var(--color-info);
+}
+
+.quota-grace-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-info);
+}
+
+.quota-grace-detail {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}

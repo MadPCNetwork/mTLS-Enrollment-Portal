@@ -7,6 +7,7 @@ A **Zero-Trust** self-service mTLS certificate management portal featuring:
 - 📜 **Dynamic X.509 Subject Mapping** - OIDC claims automatically mapped to certificate attributes
 - 👮 **Admin Console** - Global view, search, and revocation capabilities for administrators
 - 📊 **Certificate Quotas** - Limit active certificates per user/CA with optional approval fallback
+- 🔄 **Renewal Grace Period** - Seamless certificate rotation without downtime via configurable pre-expiry renewal windows
 - ✅ **Approval Workflow** - Auto-approve for admins, manual approval for others
 - 📧 **Email Notifications** - Automatic alerts for requests, approvals, and denials
 - 📦 **PKCS#12 Export** - One-click download with auto-generated password
@@ -204,6 +205,7 @@ x509_cas:
       - oidc_groups: ["admins"]
         auto_approve: true
         max_ttl: "8760h"  # 1 year
+        renewal_grace_period: "720h"  # Allow renewal 30 days before expiry
 
       # Staff need approval from security team
       - oidc_groups: ["staff", "employees"]
@@ -212,6 +214,7 @@ x509_cas:
         max_active_certs: 1            # Limit to 1 active cert
         allow_request_over_quota: true # Allow request but force manual approval if over quota
         max_ttl: "720h"                # 30 days
+        renewal_grace_period: "168h"   # Allow renewal 7 days before expiry
 ```
 
 **Rule Evaluation:**
@@ -222,6 +225,32 @@ x509_cas:
 **TTL Formats:**
 - `720h` - 720 hours (30 days)
 - `8760h` - 8760 hours (1 year)
+
+#### Renewal Grace Period
+
+The `renewal_grace_period` setting controls how early a user can request a new certificate before their current one expires, without the expiring certificate counting against their quota.
+
+This is essential for seamless certificate rotation: without a grace period, a user with `max_active_certs: 1` would need to either revoke their current certificate (losing access) or wait for it to expire before requesting a new one.
+
+**How it works:**
+- When a certificate is within the grace period of its expiry, it is **excluded from the quota count**
+- This allows the user to request a new certificate while the old one is still valid
+- The old certificate remains valid until its actual expiry date
+- The grace period only affects quota counting, not certificate validity
+
+**Example:** A rule with `max_ttl: "720h"` (30 days) and `renewal_grace_period: "168h"` (7 days) means:
+- A user with 1 active cert (30-day lifetime) can request a new cert starting 7 days before expiry
+- During those 7 days, the expiring cert does not count against `max_active_certs`
+- The user effectively has 2 valid certs for up to 7 days during the transition
+
+**Recommended values:**
+| Certificate TTL | Suggested Grace Period | Ratio |
+|----------------|----------------------|-------|
+| `8760h` (1 year) | `720h` (30 days) | ~8% |
+| `720h` (30 days) | `168h` (7 days) | ~23% |
+| `168h` (7 days) | `24h` (1 day) | ~14% |
+
+Set to `"0h"` or omit to disable the grace period (default behavior).
 
 
 

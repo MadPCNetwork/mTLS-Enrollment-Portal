@@ -69,6 +69,7 @@ x509_cas:
       - oidc_groups: ["admins", "security"]
         auto_approve: true
         max_ttl: "8760h"  # 1 year
+        renewal_grace_period: "720h"  # Allow renewal 30 days before expiry
       
       # Staff need approval from security team
       - oidc_groups: ["staff", "employees"]
@@ -77,6 +78,7 @@ x509_cas:
         allow_request_over_quota: true
         approver_groups: ["security", "admins"]
         max_ttl: "720h"   # 30 days
+        renewal_grace_period: "168h"  # Allow renewal 7 days before expiry
 
   # Example: VPN Access CA
   # - id: "vpn-access"
@@ -87,3 +89,4 @@ x509_cas:
   #     - oidc_groups: ["vpn-users"]
   #       auto_approve: true
   #       max_ttl: "168h"  # 7 days
+  #       renewal_grace_period: "24h"  # Allow renewal 1 day before expiry

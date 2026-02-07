@@ -2,7 +2,7 @@
 API routes for certificate request management.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -56,6 +56,9 @@ class CAInfo(BaseModel):
     active_cert_count: int = 0
     allow_request_over_quota: bool = True
     quota_exceeded: bool = False  # True if at or over limit
+    # Renewal grace period
+    renewal_grace_period_hours: int = 0  # 0 = no grace period
+    certs_in_grace_period: int = 0  # Number of certs within grace window (not counting against quota)
 
 
 class CertificateRequestCreate(BaseModel):
@@ -125,11 +128,24 @@ class PendingRequestInfo(BaseModel):
 # ============================================================================
 
 
-async def get_active_cert_count(user_id: str, ca_id: str, db: AsyncSession) -> int:
+async def get_active_cert_count(
+    user_id: str,
+    ca_id: str,
+    db: AsyncSession,
+    renewal_grace_period_hours: int = 0,
+) -> tuple[int, int]:
     """
     Get the count of active (non-revoked, non-expired) certificates for a user and CA.
+    
+    Returns a tuple of:
+        - total_active: All active (non-revoked, non-expired) certificates
+        - quota_active: Active certificates that count against quota.
+          Certificates within the renewal grace period of expiry are excluded
+          from the quota count, allowing users to renew before expiry.
     """
     now = datetime.utcnow()
+    
+    # Total active certs (non-revoked, non-expired)
     result = await db.execute(
         select(func.count(Certificate.id))
         .join(CertificateRequest)
@@ -140,7 +156,28 @@ async def get_active_cert_count(user_id: str, ca_id: str, db: AsyncSession) -> i
             Certificate.not_after > now,
         )
     )
-    return result.scalar() or 0
+    total_active = result.scalar() or 0
+    
+    if renewal_grace_period_hours <= 0:
+        return total_active, total_active
+    
+    # Quota-counted certs: exclude those expiring within the grace period
+    grace_cutoff = now + timedelta(hours=renewal_grace_period_hours)
+    result = await db.execute(
+        select(func.count(Certificate.id))
+        .join(CertificateRequest)
+        .where(
+            CertificateRequest.user_id == user_id,
+            CertificateRequest.ca_id == ca_id,
+            Certificate.revoked_at.is_(None),
+            Certificate.not_after > now,
+            # Exclude certs that expire before the grace cutoff
+            Certificate.not_after > grace_cutoff,
+        )
+    )
+    quota_active = result.scalar() or 0
+    
+    return total_active, quota_active
 
 
 # ============================================================================
@@ -168,13 +205,17 @@ async def list_available_cas(
                     is_approver = True
                     break
             
-            # Get active certificate count for quota
-            active_count = await get_active_cert_count(user.sub, ca.id, db)
+            # Get active certificate count for quota (with grace period awareness)
+            grace_hours = rule.parse_renewal_grace_period_hours()
+            total_active, quota_active = await get_active_cert_count(
+                user.sub, ca.id, db, renewal_grace_period_hours=grace_hours
+            )
+            certs_in_grace = total_active - quota_active
             
-            # Determine if quota is exceeded
+            # Determine if quota is exceeded (using grace-period-aware count)
             quota_exceeded = False
             if rule.max_active_certs is not None:
-                quota_exceeded = active_count >= rule.max_active_certs
+                quota_exceeded = quota_active >= rule.max_active_certs
 
             cas.append(CAInfo(
                 id=ca.id,
@@ -184,9 +225,11 @@ async def list_available_cas(
                 auto_approve=rule.auto_approve,
                 max_ttl_hours=rule.parse_ttl_hours(),
                 max_active_certs=rule.max_active_certs,
-                active_cert_count=active_count,
+                active_cert_count=total_active,
                 allow_request_over_quota=rule.allow_request_over_quota,
                 quota_exceeded=quota_exceeded,
+                renewal_grace_period_hours=grace_hours,
+                certs_in_grace_period=certs_in_grace,
             ))
     
     return cas
@@ -262,23 +305,29 @@ async def create_request(
     max_ttl = rule.parse_ttl_hours()
     requested_ttl = min(body.requested_ttl_hours or 720, max_ttl)
     
-    # Check quota limits
+    # Check quota limits (grace-period-aware)
     force_manual_approval = False
     if rule.max_active_certs is not None:
-        active_count = await get_active_cert_count(user.sub, body.ca_id, db)
-        if active_count >= rule.max_active_certs:
+        grace_hours = rule.parse_renewal_grace_period_hours()
+        total_active, quota_active = await get_active_cert_count(
+            user.sub, body.ca_id, db, renewal_grace_period_hours=grace_hours
+        )
+        if quota_active >= rule.max_active_certs:
             if not rule.allow_request_over_quota:
                 # Hard limit - block the request entirely
+                grace_msg = ""
+                if grace_hours > 0 and total_active > quota_active:
+                    grace_msg = f" ({total_active - quota_active} certificate(s) are within the renewal grace period and not counted.)"
                 audit_logger.log_quota_exceeded(
                     user=user,
                     ca_id=body.ca_id,
-                    current_count=active_count,
+                    current_count=quota_active,
                     limit=rule.max_active_certs,
                     ip_address=ip_address,
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Certificate quota exceeded. You have {active_count} active certificate(s) and the limit is {rule.max_active_certs}. Please revoke an existing certificate or wait for one to expire.",
+                    detail=f"Certificate quota exceeded. You have {quota_active} active certificate(s) counting against the limit of {rule.max_active_certs}.{grace_msg} Please revoke an existing certificate or wait for one to expire.",
                 )
             else:
                 # Soft limit - allow but force manual approval

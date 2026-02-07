@@ -49,17 +49,30 @@ class CARule(BaseModel):
     # Quota settings
     max_active_certs: Optional[int] = None  # None = unlimited
     allow_request_over_quota: bool = True  # If false, block requests when at limit
+    # Renewal grace period - how early before expiry a user can request a renewal
+    # without the expiring cert counting against their quota.
+    # Set to "0h" to disable (expiring certs always count). Default: no grace period.
+    renewal_grace_period: str = "0h"
     
     def parse_ttl_hours(self) -> int:
         """Parse TTL string to hours."""
-        ttl = self.max_ttl.strip().lower()
-        if ttl.endswith("h"):
-            return int(ttl[:-1])
-        elif ttl.endswith("d"):
-            return int(ttl[:-1]) * 24
-        elif ttl.endswith("w"):
-            return int(ttl[:-1]) * 24 * 7
-        return int(ttl)
+        return self._parse_duration(self.max_ttl)
+    
+    def parse_renewal_grace_period_hours(self) -> int:
+        """Parse renewal grace period string to hours."""
+        return self._parse_duration(self.renewal_grace_period)
+    
+    @staticmethod
+    def _parse_duration(duration: str) -> int:
+        """Parse a duration string (e.g. '720h', '30d', '4w') to hours."""
+        d = duration.strip().lower()
+        if d.endswith("h"):
+            return int(d[:-1])
+        elif d.endswith("d"):
+            return int(d[:-1]) * 24
+        elif d.endswith("w"):
+            return int(d[:-1]) * 24 * 7
+        return int(d)
 
 
 class X509CAConfig(BaseModel):
