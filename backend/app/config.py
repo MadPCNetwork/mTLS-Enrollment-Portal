@@ -28,7 +28,7 @@ class SMTPConfig(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     from_address: str = ""
-    from_address: str = ""
+    from_display_name: Optional[str] = None
     use_tls: bool = True
     local_hostname: Optional[str] = None
     approver_emails: list[str] = Field(default_factory=list)
@@ -115,7 +115,7 @@ class EnvSettings(BaseSettings):
     smtp_username: Optional[str] = None
     smtp_password: Optional[str] = None
     smtp_from_address: str = ""
-    smtp_from_address: str = ""
+    smtp_from_display_name: Optional[str] = None
     smtp_use_tls: bool = True
     smtp_server_name: Optional[str] = None
     smtp_approver_emails: str = ""
@@ -172,6 +172,7 @@ def load_config() -> AppConfig:
         username=env.smtp_username,
         password=env.smtp_password,
         from_address=env.smtp_from_address,
+        from_display_name=env.smtp_from_display_name,
         use_tls=env.smtp_use_tls,
         local_hostname=env.smtp_server_name,
         approver_emails=[e.strip() for e in env.smtp_approver_emails.split(",") if e.strip()],

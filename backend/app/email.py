@@ -33,7 +33,10 @@ async def send_notification_email(
         return
 
     message = MIMEMultipart("alternative")
-    message["From"] = config.smtp.from_address
+    if config.smtp.from_display_name:
+        message["From"] = f"{config.smtp.from_display_name} <{config.smtp.from_address}>"
+    else:
+        message["From"] = config.smtp.from_address
     message["To"] = to_email
     message["Subject"] = f"[PKI Portal] {subject}"
 
