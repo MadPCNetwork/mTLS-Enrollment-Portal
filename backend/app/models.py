@@ -93,6 +93,10 @@ class Certificate(Base):
     revoked_at = Column(DateTime, nullable=True)
     revocation_reason = Column(String(255), nullable=True)
     
+    # Renewal notification tracking
+    renewal_notification_sent_at = Column(DateTime, nullable=True)
+    renewal_grace_period_hours = Column(Integer, nullable=True)  # Grace period from the rule at issuance
+    
     # Timestamps
     issued_at = Column(DateTime, server_default=func.now(), nullable=False)
     

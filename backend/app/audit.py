@@ -31,6 +31,7 @@ class AuditEventType(str, Enum):
     CERT_REVOKED = "cert.revoked"
     CERT_REVOKED_ADMIN = "cert.revoked.admin"
     CERT_EXPIRED = "cert.expired"
+    CERT_RENEWAL_REMINDER_SENT = "cert.renewal_reminder.sent"
     
     # Admin events
     ADMIN_ACCESS = "admin.access"

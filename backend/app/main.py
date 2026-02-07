@@ -20,6 +20,7 @@ from .routes.requests import router as requests_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
+    import asyncio
     import logging
     logger = logging.getLogger(__name__)
     
@@ -37,9 +38,26 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Failed to pre-warm OIDC caches (will retry on first request): {e}")
     
+    # Start renewal notification background task if SMTP is enabled
+    renewal_task = None
+    config = load_config()
+    if config.smtp.enabled:
+        from .renewal_notifier import renewal_notification_loop
+        renewal_task = asyncio.create_task(renewal_notification_loop())
+        logger.info("Renewal notification background task scheduled")
+    else:
+        logger.info("SMTP disabled - renewal notification background task not started")
+    
     yield
-    # Shutdown
-    pass
+    
+    # Shutdown - cancel background tasks
+    if renewal_task is not None:
+        renewal_task.cancel()
+        try:
+            await renewal_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Renewal notification background task stopped")
 
 
 # Initialize rate limiter

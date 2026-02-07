@@ -1198,7 +1198,7 @@ function showModal(type, data) {
                     </div>
                     <div class="confirmation-warning-text">
                         <ul>
-                            <li><strong>System-Specific Certificate:</strong> This certificate will be bound to your current system and browser. Make sure you are generating this on a device where you intend to use the certificate.</li>
+                            <li><strong>Save This Certificate:</strong> This certificate can be installed on multiple systems. Please save it securely (ideally in a password manager) so it can be reinstalled in the future if needed.</li>
                             <li><strong>One-Time Password:</strong> A secure password will be generated for your certificate. <strong>This password will only be displayed once</strong> and cannot be recovered.</li>
                             <li><strong>Secure Storage Required:</strong> You must save the password in a secure location (e.g., password manager) before closing the dialog.</li>
                         </ul>

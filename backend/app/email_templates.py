@@ -220,6 +220,69 @@ def render_request_approved_email(
     return plain, html
 
 
+def render_renewal_reminder_email(
+    ca_name: str,
+    serial_number: str,
+    expiry_date: str,
+    days_remaining: int,
+    portal_url: Optional[str] = None,
+) -> tuple[str, str]:
+    """
+    Render the 'renewal reminder' email for certificate owners.
+
+    Sent when a certificate enters the renewal grace period, encouraging
+    the owner to renew early to avoid loss of access.
+
+    Returns:
+        (plain_text, html) tuple.
+    """
+    portal_line = f"\n\nPortal: {portal_url}" if portal_url else ""
+
+    plain = (
+        f"Your certificate for {ca_name} is approaching expiry.\n\n"
+        f"Serial Number: {serial_number}\n"
+        f"Expires: {expiry_date}\n"
+        f"Days Remaining: {days_remaining}\n\n"
+        f"You are now within the early renewal window. We recommend renewing "
+        f"your certificate as soon as possible to ensure uninterrupted access.\n\n"
+        f"Log in to the portal to request a new certificate before your "
+        f"current one expires."
+        f"{portal_line}"
+    )
+
+    if days_remaining <= 3:
+        badge = _status_badge("Expiring Soon", "#ef4444", "rgba(239,68,68,0.12)")
+    elif days_remaining <= 7:
+        badge = _status_badge("Renewal Recommended", "#f59e0b", "rgba(245,158,11,0.12)")
+    else:
+        badge = _status_badge("Renewal Window Open", "#6366f1", "rgba(99,102,241,0.12)")
+
+    details = _detail_table([
+        ("CA", ca_name),
+        ("Serial Number", f'<code style="color:#a5b4fc;">{serial_number}</code>'),
+        ("Expires", expiry_date),
+        ("Days Remaining", str(days_remaining)),
+    ])
+    button = _action_button("Renew Certificate", portal_url)
+
+    body = f"""\
+        <h1 style="margin:0 0 4px;color:#e2e2e8;font-size:20px;font-weight:600;">Certificate Renewal Reminder</h1>
+        <p style="margin:0 0 16px;color:#8b8ba0;font-size:14px;">Your certificate is eligible for early renewal.</p>
+        {badge}
+        {details}
+        <p style="margin:20px 0 0;color:#c4c4d4;font-size:14px;line-height:1.6;">
+            Your certificate will expire in <strong style="color:#e2e2e8;">{days_remaining} day(s)</strong>.
+            To minimize any risk of loss of access, we recommend renewing now. Log in to the portal,
+            request a new certificate for <strong style="color:#e2e2e8;">{ca_name}</strong>, and install
+            it before your current certificate expires.
+        </p>
+        {button}"""
+
+    html = _base_template("Certificate Renewal Reminder", body,
+                          footer_note="You received this because renewal notifications are enabled for your group.")
+    return plain, html
+
+
 def render_request_denied_email(
     ca_name: str,
     reason: Optional[str] = None,

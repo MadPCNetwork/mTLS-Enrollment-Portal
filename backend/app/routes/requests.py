@@ -475,6 +475,10 @@ async def sign_certificate(
         subject_str = format_subject_string(certificate.subject)
         serial_hex = format(certificate.serial_number, 'x')
         
+        # Resolve the matching rule to stamp the grace period for renewal notifications
+        rule, _ = get_user_matching_rule(user, cert_request.ca_id)
+        grace_hours = rule.parse_renewal_grace_period_hours() if rule and rule.renewal_notification_email else None
+        
         db_cert = Certificate(
             request_id=cert_request.id,
             serial_number=serial_hex,
@@ -482,6 +486,7 @@ async def sign_certificate(
             certificate_pem=cert_pem,
             not_before=certificate.not_valid_before_utc.replace(tzinfo=None),
             not_after=certificate.not_valid_after_utc.replace(tzinfo=None),
+            renewal_grace_period_hours=grace_hours,
         )
         db.add(db_cert)
         

@@ -53,6 +53,10 @@ class CARule(BaseModel):
     # without the expiring cert counting against their quota.
     # Set to "0h" to disable (expiring certs always count). Default: no grace period.
     renewal_grace_period: str = "0h"
+    # When enabled, sends an email to the certificate owner when their certificate
+    # enters the renewal grace period, reminding them to renew early to avoid
+    # loss of access. Requires SMTP to be configured and a renewal_grace_period > 0.
+    renewal_notification_email: bool = False
     
     def parse_ttl_hours(self) -> int:
         """Parse TTL string to hours."""
@@ -121,6 +125,9 @@ class EnvSettings(BaseSettings):
     # Config file path (for CA/subject mapping)
     config_path: str = "/app/config.yaml"
     
+    # Renewal notification check interval (seconds)
+    renewal_check_interval: int = 3600
+    
     # SMTP settings
     smtp_enabled: bool = False
     smtp_host: str = ""
@@ -145,6 +152,7 @@ class AppConfig(BaseModel):
     oidc: OIDCConfig
     database_url: str
     smtp: SMTPConfig
+    renewal_check_interval: int = 3600
     
     # From YAML config file
     subject_attributes: SubjectAttributesConfig = Field(default_factory=SubjectAttributesConfig)
@@ -231,6 +239,7 @@ def load_config() -> AppConfig:
         oidc=oidc,
         database_url=database_url,
         smtp=smtp,
+        renewal_check_interval=env.renewal_check_interval,
         subject_attributes=subject_attributes,
         san_mapping=san_mapping,
         x509_cas=x509_cas,

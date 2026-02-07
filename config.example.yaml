@@ -70,6 +70,7 @@ x509_cas:
         auto_approve: true
         max_ttl: "8760h"  # 1 year
         renewal_grace_period: "720h"  # Allow renewal 30 days before expiry
+        renewal_notification_email: true  # Email certificate owner when renewal window opens
       
       # Staff need approval from security team
       - oidc_groups: ["staff", "employees"]
@@ -79,6 +80,7 @@ x509_cas:
         approver_groups: ["security", "admins"]
         max_ttl: "720h"   # 30 days
         renewal_grace_period: "168h"  # Allow renewal 7 days before expiry
+        renewal_notification_email: true  # Email certificate owner when renewal window opens
 
   # Example: VPN Access CA
   # - id: "vpn-access"
@@ -90,3 +92,4 @@ x509_cas:
   #       auto_approve: true
   #       max_ttl: "168h"  # 7 days
   #       renewal_grace_period: "24h"  # Allow renewal 1 day before expiry
+  #       renewal_notification_email: false  # Disable renewal reminder emails

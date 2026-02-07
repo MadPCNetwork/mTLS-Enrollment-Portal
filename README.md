@@ -9,7 +9,7 @@ A **Zero-Trust** self-service mTLS certificate management portal featuring:
 - 📊 **Certificate Quotas** - Limit active certificates per user/CA with optional approval fallback
 - 🔄 **Renewal Grace Period** - Seamless certificate rotation without downtime via configurable pre-expiry renewal windows
 - ✅ **Approval Workflow** - Auto-approve for admins, manual approval for others
-- 📧 **Email Notifications** - Automatic alerts for requests, approvals, and denials
+- 📧 **Email Notifications** - Automatic alerts for requests, approvals, denials, and renewal reminders
 - 📦 **PKCS#12 Export** - One-click download with auto-generated password
 
 ## Architecture
@@ -206,6 +206,7 @@ x509_cas:
         auto_approve: true
         max_ttl: "8760h"  # 1 year
         renewal_grace_period: "720h"  # Allow renewal 30 days before expiry
+        renewal_notification_email: true  # Notify owner when renewal window opens
 
       # Staff need approval from security team
       - oidc_groups: ["staff", "employees"]
@@ -215,6 +216,7 @@ x509_cas:
         allow_request_over_quota: true # Allow request but force manual approval if over quota
         max_ttl: "720h"                # 30 days
         renewal_grace_period: "168h"   # Allow renewal 7 days before expiry
+        renewal_notification_email: true
 ```
 
 **Rule Evaluation:**
@@ -252,6 +254,40 @@ This is essential for seamless certificate rotation: without a grace period, a u
 
 Set to `"0h"` or omit to disable the grace period (default behavior).
 
+#### Renewal Notification Emails
+
+When `renewal_notification_email: true` is set on a rule, the portal sends a **one-time email** to the certificate owner when their certificate enters the renewal grace period. This proactively reminds users to renew early and install a new certificate to minimize any risk of loss of access.
+
+**Requirements:**
+- SMTP must be enabled globally (`SMTP_ENABLED=true`)
+- The rule must have a `renewal_grace_period` greater than `"0h"`
+- The certificate owner must have an email address on file (from OIDC)
+
+**Behavior:**
+- A background task checks for eligible certificates on a configurable interval (default: every hour)
+- Each certificate is only notified **once** (tracked in the database)
+- The email includes the certificate serial number, expiry date, days remaining, and a link to the portal
+- The urgency badge in the email adapts: blue for early window, amber at 7 days, red at 3 days
+
+**Configuration per rule:**
+
+```yaml
+rules:
+  - oidc_groups: ["admins"]
+    renewal_grace_period: "720h"
+    renewal_notification_email: true   # Enable reminders for this group
+
+  - oidc_groups: ["contractors"]
+    renewal_grace_period: "24h"
+    renewal_notification_email: false  # Disable reminders for this group
+```
+
+**Tuning the check interval** (optional, in `.env`):
+
+```bash
+RENEWAL_CHECK_INTERVAL=3600  # seconds (default: 3600 = 1 hour)
+```
+
 
 
 ### Email Notifications
@@ -259,6 +295,7 @@ Set to `"0h"` or omit to disable the grace period (default behavior).
 Configure SMTP in `.env` to enable notifications for:
 - **Approvers**: New pending requests
 - **Requesters**: Approval/Denial status updates
+- **Certificate Owners**: Renewal reminders when certificates enter the grace period
 
 ```bash
 SMTP_ENABLED=true
