@@ -24,6 +24,11 @@ from ..crypto import (
 )
 from ..database import get_db
 from ..email import send_notification_email
+from ..email_templates import (
+    render_new_request_email,
+    render_request_approved_email,
+    render_request_denied_email,
+)
 from ..models import Certificate, CertificateRequest, CRLEntry, RequestStatus
 
 
@@ -314,12 +319,22 @@ async def create_request(
     
     # Send email notification if pending approval
     if cert_request.status == RequestStatus.PENDING_APPROVAL:
+        ca_display_name = ca_names.get(cert_request.ca_id, cert_request.ca_id)
+        portal_url = config.app_url.rstrip("/") or None
+        plain, html = render_new_request_email(
+            requester_name=cert_request.user_display_name or "Unknown",
+            requester_email=cert_request.user_email or "",
+            ca_name=ca_display_name,
+            requested_ttl_hours=requested_ttl,
+            portal_url=portal_url,
+        )
         # Notify configured approvers
         for email in config.smtp.approver_emails:
             await send_notification_email(
                 to_email=email,
                 subject="New Certificate Request Pending Approval",
-                body=f"A new certificate request requires your approval.\n\nRequester: {cert_request.user_display_name} ({cert_request.user_email})\nCA: {config.x509_cas[0].name if config.x509_cas else cert_request.ca_id}\n\nPlease log in to the portal to approve or deny this request.",
+                body=plain,
+                html_body=html,
             )
         
     return CertificateRequestResponse(
@@ -676,10 +691,18 @@ async def approve_request(
     
     # Send email notification to requester
     if cert_request.user_email:
+        ca_names = {ca.id: ca.name for ca in config.x509_cas}
+        ca_display_name = ca_names.get(cert_request.ca_id, cert_request.ca_id)
+        portal_url = config.app_url.rstrip("/") or None
+        plain, html = render_request_approved_email(
+            ca_name=ca_display_name,
+            portal_url=portal_url,
+        )
         await send_notification_email(
             to_email=cert_request.user_email,
             subject="Certificate Request Approved",
-            body=f"Your certificate request for {cert_request.ca_id} has been approved.\n\nYou can now log in to the portal to generate your certificate.",
+            body=plain,
+            html_body=html,
         )
     
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -757,10 +780,19 @@ async def deny_request(
     
     # Send email notification to requester
     if cert_request.user_email:
+        ca_names = {ca.id: ca.name for ca in config.x509_cas}
+        ca_display_name = ca_names.get(cert_request.ca_id, cert_request.ca_id)
+        portal_url = config.app_url.rstrip("/") or None
+        plain, html = render_request_denied_email(
+            ca_name=ca_display_name,
+            reason=cert_request.denial_reason,
+            portal_url=portal_url,
+        )
         await send_notification_email(
             to_email=cert_request.user_email,
             subject="Certificate Request Denied",
-            body=f"Your certificate request for {cert_request.ca_id} has been denied.\n\nReason: {cert_request.denial_reason or 'No reason provided'}",
+            body=plain,
+            html_body=html,
         )
     
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -15,6 +15,7 @@ async def send_notification_email(
     to_email: str,
     subject: str,
     body: str,
+    html_body: Optional[str] = None,
 ):
     """
     Send a notification email.
@@ -22,18 +23,26 @@ async def send_notification_email(
     Args:
         to_email: Recipient email address
         subject: Email subject
-        body: Email body (plain text)
+        body: Email body (plain text fallback)
+        html_body: Optional HTML body. When provided, the email is sent as
+                   multipart/alternative with both plain text and HTML parts.
     """
     config = get_config()
     
     if not config.smtp.enabled:
         return
 
-    message = MIMEMultipart()
+    message = MIMEMultipart("alternative")
     message["From"] = config.smtp.from_address
     message["To"] = to_email
     message["Subject"] = f"[PKI Portal] {subject}"
+
+    # Plain text is always attached first (lowest priority per RFC 2046)
     message.attach(MIMEText(body, "plain"))
+
+    # HTML part is attached second (preferred by email clients)
+    if html_body:
+        message.attach(MIMEText(html_body, "html"))
 
     try:
         smtp_client = SMTP(
